@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Havenfield — Luxury Real Estate</title>
+    <!-- Critical + loader styles: inlined so they apply on the very first paint,
+         before any CSS bundle is fetched. The loader element is removed from the
+         DOM after the 3D model loads, so these rules never need to be in the bundle. -->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      body { margin: 0; background: #2D3939; }
+
+      #loader {
+        position: fixed; inset: 0; z-index: 200;
+        background: #2D3939;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 28px;
+      }
+      .loader__house  { width: 110px; height: 110px; }
+      .loader__label  {
+        font-size: 11px; font-weight: 700;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(207, 216, 223, 0.4);   /* $color-light at 40% */
+        animation: loader-pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes loader-pulse {
+        0%, 100% { opacity: 0.35; }
+        50%      { opacity: 1; }
+      }
+    </style>
+    <script type="module" crossorigin src="/havenfield/assets/index-CXqrAv4B.js"></script>
+    <link rel="stylesheet" crossorigin href="/havenfield/assets/index-Da4Xehbe.css">
+  </head>
+  <body>
+
+    <!-- Page loader -->
+    <div id="loader">
+      <svg class="loader__house" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Shimmer gradient sweeps left → right via SMIL animate -->
+          <linearGradient id="lg" gradientUnits="userSpaceOnUse" x1="-80" y1="0" x2="0" y2="0">
+            <stop offset="0%"   stop-color="#CFD8DF" stop-opacity="0"/>
+            <stop offset="40%"  stop-color="#CFD8DF" stop-opacity="0.75"/>
+            <stop offset="60%"  stop-color="#CFD8DF" stop-opacity="0.75"/>
+            <stop offset="100%" stop-color="#CFD8DF" stop-opacity="0"/>
+            <animate attributeName="x1" from="-80" to="80"  dur="1.8s" repeatCount="indefinite"/>
+            <animate attributeName="x2" from="0"   to="160" dur="1.8s" repeatCount="indefinite"/>
+          </linearGradient>
+          <!-- House silhouette used as clip path for the shimmer -->
+          <clipPath id="hc">
+            <polygon points="40,5 75,32 75,75 5,75 5,32"/>
+            <rect x="52" y="11" width="10" height="23"/>
+          </clipPath>
+        </defs>
+
+        <!-- House walls + roof -->
+        <polygon points="40,5 75,32 75,75 5,75 5,32" fill="#9DADA3"/>
+        <!-- Chimney -->
+        <rect x="52" y="11" width="10" height="23" fill="#9DADA3"/>
+        <!-- Door -->
+        <rect x="29" y="50" width="22" height="25" fill="#2D3939" opacity="0.55" rx="2"/>
+        <!-- Windows -->
+        <rect x="10" y="40" width="15" height="14" fill="#2D3939" opacity="0.35" rx="2"/>
+        <rect x="55" y="40" width="15" height="14" fill="#2D3939" opacity="0.35" rx="2"/>
+        <!-- Shimmer sweep clipped to house outline -->
+        <rect x="0" y="0" width="80" height="80" fill="url(#lg)" clip-path="url(#hc)"/>
+      </svg>
+      <span class="loader__label">Havenfield</span>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <!-- Audio widget -->
+    <div class="widget">
+      <!-- Controls: Play / Pause / Stop — appear on hover when audio is active -->
+      <div class="widget__controls">
+        <button class="widget__ctrl widget__ctrl--play" aria-label="Play" disabled>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><polygon points="3,1 14,8 3,15" fill="currentColor"/></svg>
+        </button>
+        <button class="widget__ctrl widget__ctrl--pause" aria-label="Pause" disabled>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="1" width="4" height="14" rx="1" fill="currentColor"/><rect x="10" y="1" width="4" height="14" rx="1" fill="currentColor"/></svg>
+        </button>
+        <button class="widget__ctrl widget__ctrl--stop" aria-label="Stop" disabled>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="1.5" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <!-- Main button -->
+      <button class="widget__btn" aria-label="Audio guide">
+        <svg class="widget__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <span class="widget__spinner"></span>
+      </button>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+      <a href="#hero" class="header__logo">Havenfield</a>
+      <button class="header__burger" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="header__nav">
+        <a href="#about">About</a>
+        <a href="#properties">Properties</a>
+        <a href="#process">Process</a>
+        <a href="#contact">Contact</a>
+        <a href="#contact" class="header__nav-cta">Get Started</a>
+      </nav>
+      <a href="#contact" class="header__cta">Get Started</a>
+    </header>
+
+    <main>
+
+      <!-- 1. Hero -->
+      <section id="hero" class="section section--hero">
+        <div class="hero">
+          <p class="hero__label">Premium Real Estate</p>
+          <h1 class="hero__title">Find Your<br>Dream Home</h1>
+          <p class="hero__text">We connect you with the finest properties. Explore your future home in stunning 3D before you visit.</p>
+          <a href="#properties" class="btn btn--dark">Explore Properties</a>
+        </div>
+      </section>
+
+      <!-- 2. About -->
+      <section id="about" class="section section--light">
+        <div class="container">
+          <p class="section__label">Who We Are</p>
+          <h2 class="section__title">Real estate<br>done differently</h2>
+          <div class="cards">
+            <div class="card">
+              <span class="card__num">01</span>
+              <h3 class="card__title">3D Previews</h3>
+              <p class="card__text">Tour every property in full 3D before stepping through the door.</p>
+            </div>
+            <div class="card">
+              <span class="card__num">02</span>
+              <h3 class="card__title">Expert Agents</h3>
+              <p class="card__text">Our licensed agents guide you from first search to final close.</p>
+            </div>
+            <div class="card">
+              <span class="card__num">03</span>
+              <h3 class="card__title">Transparent Pricing</h3>
+              <p class="card__text">No hidden fees. Clear, honest pricing on every single listing.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Properties -->
+      <section id="properties" class="section section--dark">
+        <div class="container">
+          <p class="section__label">Featured Listings</p>
+          <h2 class="section__title">Homes<br>for sale</h2>
+          <div class="properties">
+            <div class="property">
+              <div class="property__top">
+                <span class="property__badge">New</span>
+                <span class="property__price">$1,240,000</span>
+              </div>
+              <h3 class="property__name">The Maple Estate</h3>
+              <p class="property__meta">4 bed · 3 bath · 2,800 sqft · Portland, OR</p>
+              <a href="#contact" class="btn btn--light">View Listing</a>
+            </div>
+            <div class="property">
+              <div class="property__top">
+                <span class="property__badge property__badge--hot">Hot</span>
+                <span class="property__price">$890,000</span>
+              </div>
+              <h3 class="property__name">Riverside Retreat</h3>
+              <p class="property__meta">3 bed · 2 bath · 1,950 sqft · Austin, TX</p>
+              <a href="#contact" class="btn btn--light">View Listing</a>
+            </div>
+            <div class="property">
+              <div class="property__top">
+                <span class="property__badge property__badge--sale">−12%</span>
+                <span class="property__price">$2,100,000</span>
+              </div>
+              <h3 class="property__name">Cedar Hill Villa</h3>
+              <p class="property__meta">5 bed · 4 bath · 3,400 sqft · Malibu, CA</p>
+              <a href="#contact" class="btn btn--light">View Listing</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Process -->
+      <section id="process" class="section section--light">
+        <div class="container">
+          <p class="section__label">How It Works</p>
+          <h2 class="section__title">Three steps<br>to your new home</h2>
+          <div class="steps">
+            <div class="step">
+              <span class="step__num">01</span>
+              <h3 class="step__title">Browse Listings</h3>
+              <p class="step__text">Search our curated catalog of premium properties filtered by location, size, and budget.</p>
+            </div>
+            <div class="step">
+              <span class="step__num">02</span>
+              <h3 class="step__title">Virtual Tour</h3>
+              <p class="step__text">Experience the property in 3D from anywhere. Get a real feel before you ever step inside.</p>
+            </div>
+            <div class="step">
+              <span class="step__num">03</span>
+              <h3 class="step__title">Close the Deal</h3>
+              <p class="step__text">Our agents handle everything — paperwork, negotiations, and move-in support.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Stats -->
+      <section class="section section--dark section--stats">
+        <div class="container">
+          <div class="stats">
+            <div class="stat">
+              <span class="stat__num">1,200+</span>
+              <p class="stat__label">Homes Sold</p>
+            </div>
+            <div class="stat">
+              <span class="stat__num">98%</span>
+              <p class="stat__label">Client Satisfaction</p>
+            </div>
+            <div class="stat">
+              <span class="stat__num">15</span>
+              <p class="stat__label">Years Experience</p>
+            </div>
+            <div class="stat">
+              <span class="stat__num">$2.4B</span>
+              <p class="stat__label">Sales Volume</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Testimonials -->
+      <section class="section section--light">
+        <div class="container">
+          <p class="section__label">Client Stories</p>
+          <h2 class="section__title">What our<br>clients say</h2>
+          <div class="testimonials">
+            <div class="testimonial">
+              <p class="testimonial__text">"Havenfield made buying our first home feel completely effortless. The 3D tours saved us countless trips and hours of uncertainty."</p>
+              <cite class="testimonial__cite">— Sarah & James T., Portland</cite>
+            </div>
+            <div class="testimonial">
+              <p class="testimonial__text">"We sold our property in 11 days, above asking price. The team was responsive, honest, and genuinely impressive."</p>
+              <cite class="testimonial__cite">— Michael R., Austin</cite>
+            </div>
+            <div class="testimonial">
+              <p class="testimonial__text">"From the first 3D walkthrough to signing the papers — the whole process felt premium. Couldn't recommend more highly."</p>
+              <cite class="testimonial__cite">— Lena K., Los Angeles</cite>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. CTA -->
+      <section class="section section--cta">
+        <div class="container">
+          <h2 class="cta__title">Ready to find<br>your place?</h2>
+          <p class="cta__text">Let our team help you discover a home that fits your life perfectly. No pressure, just good advice.</p>
+          <a href="#contact" class="btn btn--light">Talk to an Agent</a>
+        </div>
+      </section>
+
+      <!-- 8. Contact -->
+      <section id="contact" class="section section--dark">
+        <div class="container container--narrow">
+          <p class="section__label">Get in Touch</p>
+          <h2 class="section__title">Let's talk<br>about your home</h2>
+          <form class="contact-form">
+            <div class="contact-form__row">
+              <input type="text" placeholder="Your name" />
+              <input type="email" placeholder="Email address" />
+            </div>
+            <textarea placeholder="Tell us about your dream home..." rows="5"></textarea>
+            <button type="submit" class="btn btn--light">Send Message</button>
+          </form>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer__top">
+        <div class="footer__brand">
+          <span class="footer__logo">Havenfield</span>
+          <p>Premium real estate for those who value quality, transparency, and timeless design.</p>
+        </div>
+        <div class="footer__col">
+          <h4>Properties</h4>
+          <a href="#">For Sale</a>
+          <a href="#">For Rent</a>
+          <a href="#">New Builds</a>
+          <a href="#">Commercial</a>
+        </div>
+        <div class="footer__col">
+          <h4>Company</h4>
+          <a href="#">About Us</a>
+          <a href="#">Our Agents</a>
+          <a href="#">Careers</a>
+          <a href="#">Press</a>
+        </div>
+        <div class="footer__col">
+          <h4>Legal</h4>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Use</a>
+          <a href="#">Cookie Policy</a>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <p>© 2026 Havenfield Real Estate. All rights reserved.</p>
+        <div class="footer__socials">
+          <a href="#">Instagram</a>
+          <a href="#">LinkedIn</a>
+          <a href="#">X</a>
+        </div>
+      </div>
+    </footer>
+
+  </body>
+</html>
