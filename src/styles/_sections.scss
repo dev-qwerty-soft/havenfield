@@ -1,0 +1,355 @@
+@use 'variables' as *;
+@use 'sass:color';
+
+// ── Shared ──────────────────────────────────────────────
+
+.section {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 120px 0;
+}
+
+.section--light  { background: $color-light; }
+.section--dark   { background: $color-dark; }
+.section--forest { background: $color-forest; }
+
+#about { background: color.mix($color-dark, $color-light, 14%); }
+
+// Card colours on forest background
+.section--forest {
+  .card            { border-top-color: rgba($color-light, 0.15); }
+  .card__num       { color: $color-sage; }
+  .card__title     { color: $color-light; }
+  .card__text      { color: rgba($color-light, 0.62); }
+}
+
+.container {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 8vw;
+}
+
+.container--narrow {
+  max-width: 760px;
+}
+
+.section__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: $color-sage;
+  margin-bottom: 18px;
+}
+
+.section__title {
+  font-size: clamp(36px, 4.5vw, 60px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 64px;
+
+  .section--light & { color: $color-dark; }
+  .section--dark  & { color: $color-light; }
+}
+
+// ── Buttons ─────────────────────────────────────────────
+
+.btn {
+  display: inline-block;
+  font-family: $font-main;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 14px 30px;
+  border-radius: 6px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+
+  &:hover {
+    opacity: 0.82;
+    transform: translateY(-1px);
+  }
+}
+
+.btn--dark  { background: $color-dark;  color: $color-light; }
+.btn--light { background: $color-light; color: $color-dark;  }
+
+// ── About — Cards ───────────────────────────────────────
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+
+.card {
+  border-top: 1px solid rgba($color-dark, 0.15);
+  padding-top: 28px;
+}
+
+.card__num {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: $color-sage;
+  margin-bottom: 20px;
+}
+
+.card__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: $color-dark;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.card__text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: $color-mid;
+}
+
+// ── Process — transparent right side (3D canvas shows through) ──
+// Scene background = $color-light, so the gradient blends seamlessly.
+
+#process {
+  background: linear-gradient(90deg, $color-light 48%, rgba($color-light, 0) 78%);
+}
+
+// ── Properties ──────────────────────────────────────────
+
+.properties {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.property {
+  border: 1px solid rgba($color-light, 0.1);
+  border-radius: 10px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.25s;
+
+  &:hover {
+    border-color: rgba($color-light, 0.3);
+  }
+}
+
+.property__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.property__badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba($color-sage, 0.2);
+  color: $color-sage;
+  padding: 4px 10px;
+  border-radius: 4px;
+
+  &--hot  { background: rgba(#c0392b, 0.2); color: #e57373; }
+  &--sale { background: rgba($color-forest, 0.4); color: #7aab6a; }
+}
+
+.property__price {
+  font-size: 18px;
+  font-weight: 700;
+  color: $color-light;
+  letter-spacing: -0.02em;
+}
+
+.property__name {
+  font-size: 22px;
+  font-weight: 600;
+  color: $color-light;
+  letter-spacing: -0.02em;
+}
+
+.property__meta {
+  font-size: 14px;
+  color: $color-mid;
+  margin-bottom: 8px;
+  flex: 1;
+}
+
+// ── Process — Steps ─────────────────────────────────────
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 48px;
+}
+
+.step__num {
+  display: block;
+  font-size: 72px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: rgba($color-dark, 0.1);
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.step__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: $color-dark;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+
+.step__text {
+  font-size: 15px;
+  line-height: 1.65;
+  color: $color-mid;
+}
+
+// ── Stats ───────────────────────────────────────────────
+
+.section--stats {
+  min-height: auto;
+  padding: 100px 0;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 48px;
+  text-align: center;
+}
+
+.stat__num {
+  display: block;
+  font-size: clamp(40px, 5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: $color-light;
+  margin-bottom: 8px;
+}
+
+.stat__label {
+  font-size: 14px;
+  color: $color-mid;
+  letter-spacing: 0.02em;
+}
+
+// ── Testimonials ─────────────────────────────────────────
+
+.testimonials {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+}
+
+.testimonial {
+  border-left: 2px solid $color-sage;
+  padding-left: 28px;
+}
+
+.testimonial__text {
+  font-size: 16px;
+  line-height: 1.7;
+  color: $color-mid;
+  font-style: italic;
+  margin-bottom: 20px;
+}
+
+.testimonial__cite {
+  font-size: 13px;
+  font-weight: 600;
+  color: $color-dark;
+  letter-spacing: 0.02em;
+  font-style: normal;
+}
+
+// ── CTA ─────────────────────────────────────────────────
+
+.section--cta {
+  background: $color-forest;
+  text-align: center;
+  min-height: auto;
+  padding: 120px 0;
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+}
+
+.cta__title {
+  font-size: clamp(36px, 4.5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: $color-light;
+}
+
+.cta__text {
+  font-size: 17px;
+  line-height: 1.65;
+  color: rgba($color-light, 0.7);
+  max-width: 480px;
+}
+
+// ── Contact ─────────────────────────────────────────────
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.contact-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.contact-form input,
+.contact-form textarea {
+  width: 100%;
+  font-family: $font-main;
+  font-size: 15px;
+  color: $color-light;
+  background: rgba($color-light, 0.06);
+  border: 1px solid rgba($color-light, 0.12);
+  border-radius: 6px;
+  padding: 14px 18px;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: none;
+
+  &::placeholder { color: rgba($color-light, 0.35); }
+
+  &:focus { border-color: rgba($color-sage, 0.5); }
+}
+
+// ── TTS highlight — element currently being read aloud ─────
+
+.is-speaking {
+  border-radius: 4px;
+  animation: speaking-glow 1s ease-in-out infinite alternate;
+}
+
+@keyframes speaking-glow {
+  from { box-shadow: 0 0 0 5px rgba($color-sage, 0.18); }
+  to   { box-shadow: 0 0 0 8px rgba($color-sage, 0.38), 0 0 22px rgba($color-sage, 0.14); }
+}

@@ -1,0 +1,139 @@
+@use 'variables' as *;
+
+.widget {
+  position: fixed;
+  top: 82px;
+  right: 24px;
+  z-index: 90;
+  opacity: 0;    // GSAP animates in on load
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+// ── Main trigger button ────────────────────────────────────
+
+.widget__btn {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba($color-dark, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba($color-light, 0.14);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.25s, transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+  box-shadow: 0 4px 20px rgba($color-dark, 0.25);
+
+  &:hover {
+    background: rgba($color-dark, 0.96);
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba($color-dark, 0.35);
+  }
+
+  &:active { transform: scale(0.96); }
+}
+
+.widget__icon {
+  width: 22px;
+  height: 22px;
+  color: $color-light;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+// ── Spinner (shown while speech synthesis initialises) ─────
+
+.widget__spinner {
+  position: absolute;
+  inset: 7px;
+  border: 2px solid rgba($color-light, 0.12);
+  border-top-color: $color-sage;
+  border-radius: 50%;
+  animation: widget-spin 0.75s linear infinite;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+@keyframes widget-spin {
+  to { transform: rotate(360deg); }
+}
+
+// ── States ─────────────────────────────────────────────────
+
+.widget[data-state="loading"] {
+  .widget__btn   { cursor: wait; }
+  .widget__icon  { opacity: 0.2; }
+  .widget__spinner { opacity: 1; }
+}
+
+.widget[data-state="playing"] .widget__btn {
+  border-color: rgba($color-sage, 0.5);
+  box-shadow: 0 0 0 3px rgba($color-sage, 0.12), 0 4px 20px rgba($color-dark, 0.25);
+}
+
+// ── Controls panel ─────────────────────────────────────────
+
+.widget__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+// Reveal on hover when audio is active (playing or paused)
+.widget.is-active:hover .widget__controls {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.widget__ctrl {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba($color-dark, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba($color-light, 0.14);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, transform 0.2s, opacity 0.2s;
+  box-shadow: 0 4px 16px rgba($color-dark, 0.2);
+
+  svg {
+    width: 15px;
+    height: 15px;
+    color: $color-light;
+    display: block;
+  }
+
+  &:hover {
+    background: rgba($color-dark, 0.96);
+    transform: scale(1.1);
+  }
+
+  &:active { transform: scale(0.92); }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+    pointer-events: none;
+  }
+}

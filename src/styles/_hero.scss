@@ -1,0 +1,49 @@
+@use 'variables' as *;
+
+.section--hero {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+  pointer-events: none; // canvas receives mouse events through the transparent hero area
+}
+
+.hero {
+  padding-left: 8vw;
+  max-width: 560px;
+  pointer-events: auto; // re-enable for text and button
+}
+
+.hero__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: $color-mid;
+  margin-bottom: 20px;
+  opacity: 0;
+}
+
+.hero__title {
+  font-size: clamp(48px, 6.5vw, 92px);
+  font-weight: 700;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  color: $color-dark;
+  margin-bottom: 28px;
+  opacity: 0;
+}
+
+.hero__text {
+  font-size: 17px;
+  line-height: 1.65;
+  color: $color-mid;
+  margin-bottom: 40px;
+  max-width: 420px;
+  opacity: 0;
+}
+
+.hero__btn {
+  opacity: 0;
+}

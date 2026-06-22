@@ -1,0 +1,33 @@
+@use 'variables' as *;
+@use 'reset';
+@use '@fontsource/outfit/index.css';
+@use 'header';
+@use 'hero';
+@use 'sections';
+@use 'footer';
+@use 'widget';
+@use 'mobile';
+
+body {
+  background: $color-light;
+  color: $color-dark;
+  font-family: $font-main;
+}
+
+#canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+// Scrollbar
+::-webkit-scrollbar       { width: 5px; }
+::-webkit-scrollbar-track { background: $color-dark; }
+::-webkit-scrollbar-thumb {
+  background: $color-sage;
+  border-radius: 3px;
+  &:hover { background: $color-light; }
+}
+* { scrollbar-width: thin; scrollbar-color: $color-sage $color-dark; }
