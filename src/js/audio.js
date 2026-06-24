@@ -45,17 +45,21 @@ function buildSpeechContent() {
   return { text, segments };
 }
 
-// Map each non-whitespace token in text to the segment (DOM element) that owns it
-function buildWordMap(text, segments) {
-  const map   = [];
-  const regex = /\S+/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const pos = match.index;
-    const seg = segments.find(s => pos >= s.start && pos < s.end);
-    map.push(seg ? seg.element : null);
+// Map each timestamp word to its DOM element by finding its char position in text
+function buildTimeline(text, segments, timestamps) {
+  const timeline = [];
+  let searchFrom = 0;
+
+  for (const t of timestamps) {
+    const idx = text.indexOf(t.word, searchFrom);
+    if (idx === -1) continue;
+    searchFrom = idx + t.word.length;
+
+    const seg = segments.find(s => idx >= s.start && idx < s.end);
+    if (seg) timeline.push({ element: seg.element, startMs: t.start_ms });
   }
-  return map;
+
+  return timeline;
 }
 
 // ── Highlight helpers ──────────────────────────────────────
@@ -125,14 +129,8 @@ async function startSpeech() {
   const timestamps = data.timestamps ?? [];
 
   if (timestamps.length > 0) {
-    // Use real word timestamps from Inworld: map each word to its DOM element
-    const wordMap = buildWordMap(text, segments);
-    wordTimeline = timestamps
-      .map((w, i) => ({
-        element: wordMap[i] ?? null,
-        startMs: w.start_ms ?? 0,
-      }))
-      .filter(w => w.element !== null);
+    // Use real word timestamps: locate each word by char position, no index drift
+    wordTimeline = buildTimeline(text, segments, timestamps);
   } else {
     // Fallback: distribute segment highlights proportionally by character count
     audioEl.addEventListener('loadedmetadata', () => {
