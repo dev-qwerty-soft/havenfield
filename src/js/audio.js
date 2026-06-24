@@ -4,13 +4,8 @@ const playBtn   = widgetEl.querySelector('.widget__ctrl--play');
 const pauseBtn  = widgetEl.querySelector('.widget__ctrl--pause');
 const stopBtn   = widgetEl.querySelector('.widget__ctrl--stop');
 
-const synth = window.speechSynthesis;
-let utterance        = null;
-let audioState       = 'idle';
-let currentHighlight = null;
-let speechSegments   = [];
+const PROXY_URL = 'https://havenfield.qwerty-soft.com/proxy.php';
 
-// Specific BEM selectors — no nesting between them so no duplicates in DOM order
 const SPEAK_SEL = [
   '.hero__label', '.hero__title', '.hero__text',
   '.section__label', '.section__title',
@@ -22,7 +17,12 @@ const SPEAK_SEL = [
   '.cta__title', '.cta__text',
 ].join(', ');
 
-// ── Build utterance text + character-range → element map ──
+let audioEl          = null;
+let audioState       = 'idle';
+let currentHighlight = null;
+let wordTimeline     = []; // [{ element, startMs, endMs }]
+
+// ── Build concatenated text + character-range → element map ──
 
 function buildSpeechContent() {
   const elements = [...document.querySelectorAll(`main ${SPEAK_SEL}`)];
@@ -34,7 +34,6 @@ function buildSpeechContent() {
     if (!raw) return;
 
     if (text) {
-      // Sentence boundary = natural TTS pause; only add if not already punctuated
       text += /[.!?]$/.test(text) ? ' ' : '. ';
     }
 
@@ -46,15 +45,28 @@ function buildSpeechContent() {
   return { text, segments };
 }
 
+// Map each whitespace-delimited token in text to the segment that owns it
+function buildWordMap(text, segments) {
+  const map   = [];
+  const regex = /\S+/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const pos = match.index;
+    const seg = segments.find(s => pos >= s.start && pos < s.end);
+    map.push(seg ? seg.element : null);
+  }
+  return map;
+}
+
 // ── Highlight helpers ──────────────────────────────────────
 
 function highlight(el) {
   if (currentHighlight === el) return;
   if (currentHighlight) currentHighlight.classList.remove('is-speaking');
+  if (!el) return;
   el.classList.add('is-speaking');
   currentHighlight = el;
 
-  // Scroll into view if outside visible area (with some margin for the fixed header)
   const rect = el.getBoundingClientRect();
   if (rect.top < 80 || rect.bottom > window.innerHeight - 40) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -81,43 +93,66 @@ function setAudioState(s) {
 
 // ── Speech ─────────────────────────────────────────────────
 
-function startSpeech() {
+async function startSpeech() {
   if (audioState !== 'idle') return;
   setAudioState('loading');
 
   const { text, segments } = buildSpeechContent();
-  speechSegments = segments;
+  const wordMap = buildWordMap(text, segments);
 
-  utterance        = new SpeechSynthesisUtterance(text);
-  utterance.lang   = 'en-US';
-  utterance.rate   = 0.9;
-  utterance.pitch  = 1;
-
-  utterance.onstart  = () => setAudioState('playing');
-  utterance.onpause  = () => setAudioState('paused');
-  utterance.onresume = () => setAudioState('playing');
-
-  utterance.onend = () => {
-    clearHighlight();
-    utterance = null;
+  let data;
+  try {
+    const res = await fetch(PROXY_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error(`Proxy ${res.status}`);
+    data = await res.json();
+  } catch (err) {
+    console.error('TTS fetch failed:', err);
     setAudioState('idle');
-  };
+    return;
+  }
 
-  utterance.onerror = () => {
+  // base64 MP3 → Blob URL
+  const binary = atob(data.audio);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+
+  // Build timeline: each word timestamp → owning DOM element
+  wordTimeline = (data.timestamps ?? [])
+    .map((w, i) => ({
+      element: wordMap[i] ?? null,
+      startMs: w.start_ms ?? w.startMs ?? w.start ?? 0,
+    }))
+    .filter(w => w.element !== null);
+
+  audioEl = new Audio(blobUrl);
+
+  audioEl.addEventListener('play',  () => setAudioState('playing'));
+  audioEl.addEventListener('pause', () => setAudioState('paused'));
+  audioEl.addEventListener('ended', () => {
     clearHighlight();
-    utterance = null;
+    URL.revokeObjectURL(blobUrl);
+    audioEl      = null;
+    wordTimeline = [];
     setAudioState('idle');
-  };
+  });
 
-  // charIndex from boundary event maps into our concatenated text
-  utterance.onboundary = (e) => {
-    if (e.name !== 'word') return;
-    const i   = e.charIndex;
-    const seg = speechSegments.find(s => i >= s.start && i < s.end);
-    if (seg) highlight(seg.element);
-  };
+  // Highlight the element that owns the current word
+  audioEl.addEventListener('timeupdate', () => {
+    const ms = audioEl.currentTime * 1000;
+    let current = null;
+    for (const w of wordTimeline) {
+      if (w.startMs <= ms) current = w;
+      else break;
+    }
+    highlight(current ? current.element : null);
+  });
 
-  synth.speak(utterance);
+  audioEl.play();
 }
 
 // ── Controls ───────────────────────────────────────────────
@@ -127,18 +162,21 @@ widgetBtn.addEventListener('click', () => {
 });
 
 playBtn.addEventListener('click', () => {
-  if      (audioState === 'paused') synth.resume();
+  if      (audioState === 'paused') audioEl?.play();
   else if (audioState === 'idle')   startSpeech();
 });
 
 pauseBtn.addEventListener('click', () => {
-  if (audioState === 'playing') synth.pause();
+  if (audioState === 'playing') audioEl?.pause();
 });
 
 stopBtn.addEventListener('click', () => {
-  synth.cancel();
+  if (audioEl) {
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  }
   clearHighlight();
-  utterance = null;
+  wordTimeline = [];
   setAudioState('idle');
 });
 
