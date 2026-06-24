@@ -104,12 +104,12 @@ function splitChunks(string $text, int $max): array {
 // === CALL INWORLD FOR ONE CHUNK ===
 function callInworld(string $text): array {
     $payload = json_encode([
-        'text'                   => $text,
-        'voice_id'               => INWORLD_VOICE,
-        'audio_config'           => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
-        'temperature'            => 1,
-        'model_id'               => INWORLD_MODEL,
-        'enable_word_timestamps' => true,
+        'text'          => $text,
+        'voice_id'      => INWORLD_VOICE,
+        'audio_config'  => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
+        'temperature'   => 1,
+        'model_id'      => INWORLD_MODEL,
+        'timestampType' => 'WORD',
     ]);
 
     $ch = curl_init('https://api.inworld.ai/tts/v1/voice:stream');
@@ -136,23 +136,10 @@ function callInworld(string $text): array {
     $audioBinary = '';
     $timestamps  = [];
 
-    // Try single JSON response first (Inworld returns complete JSON, not SSE lines)
     $json = json_decode($raw, true);
+    $chunks = [];
     if ($json) {
-        $chunks = isset($json['result']) ? [$json] : $json;
-        foreach ((array) $chunks as $chunk) {
-            $result = $chunk['result'] ?? $chunk;
-            if (!empty($result['audioContent'])) {
-                $audioBinary .= base64_decode($result['audioContent']);
-            }
-            $words = $result['alignment']['words']
-                  ?? $result['timestamps']['words']
-                  ?? $result['words']
-                  ?? [];
-            foreach ($words as $w) {
-                $timestamps[] = $w;
-            }
-        }
+        $chunks = isset($json['result']) ? [$json] : (array) $json;
     } else {
         // Fallback: parse line-by-line SSE
         foreach (explode("\n", $raw) as $line) {
@@ -160,17 +147,30 @@ function callInworld(string $text): array {
             if (!$line || $line === 'data: [DONE]') continue;
             if (str_starts_with($line, 'data: ')) $line = substr($line, 6);
             $chunk = json_decode($line, true);
-            if (!$chunk) continue;
-            $result = $chunk['result'] ?? $chunk;
-            if (!empty($result['audioContent'])) {
-                $audioBinary .= base64_decode($result['audioContent']);
-            }
-            $words = $result['alignment']['words']
-                  ?? $result['timestamps']['words']
-                  ?? $result['words']
-                  ?? [];
-            foreach ($words as $w) {
-                $timestamps[] = $w;
+            if ($chunk) $chunks[] = $chunk;
+        }
+    }
+
+    foreach ($chunks as $chunk) {
+        $result = $chunk['result'] ?? $chunk;
+
+        if (!empty($result['audioContent'])) {
+            $audioBinary .= base64_decode($result['audioContent']);
+        }
+
+        // Parse word timestamps: timestampInfo.wordAlignment (parallel arrays)
+        $alignment = $result['timestampInfo']['wordAlignment'] ?? null;
+        if ($alignment && !empty($alignment['words'])) {
+            $wordTokens = $alignment['words'];
+            $startTimes = $alignment['wordStartTimeSeconds'] ?? [];
+            $endTimes   = $alignment['wordEndTimeSeconds']   ?? [];
+            foreach ($wordTokens as $i => $word) {
+                if (trim($word) === '') continue; // skip whitespace tokens
+                $timestamps[] = [
+                    'word'     => $word,
+                    'start_ms' => (int) round(($startTimes[$i] ?? 0) * 1000),
+                    'end_ms'   => (int) round(($endTimes[$i]   ?? 0) * 1000),
+                ];
             }
         }
     }

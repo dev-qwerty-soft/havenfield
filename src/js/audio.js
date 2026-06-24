@@ -45,6 +45,19 @@ function buildSpeechContent() {
   return { text, segments };
 }
 
+// Map each non-whitespace token in text to the segment (DOM element) that owns it
+function buildWordMap(text, segments) {
+  const map   = [];
+  const regex = /\S+/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const pos = match.index;
+    const seg = segments.find(s => pos >= s.start && pos < s.end);
+    map.push(seg ? seg.element : null);
+  }
+  return map;
+}
+
 // ── Highlight helpers ──────────────────────────────────────
 
 function highlight(el) {
@@ -109,15 +122,28 @@ async function startSpeech() {
 
   audioEl = new Audio(blobUrl);
 
-  // Once duration is known, distribute segment start times proportionally by char position
-  audioEl.addEventListener('loadedmetadata', () => {
-    const totalMs    = audioEl.duration * 1000;
-    const totalChars = text.length;
-    wordTimeline = segments.map(seg => ({
-      element: seg.element,
-      startMs: (seg.start / totalChars) * totalMs,
-    }));
-  });
+  const timestamps = data.timestamps ?? [];
+
+  if (timestamps.length > 0) {
+    // Use real word timestamps from Inworld: map each word to its DOM element
+    const wordMap = buildWordMap(text, segments);
+    wordTimeline = timestamps
+      .map((w, i) => ({
+        element: wordMap[i] ?? null,
+        startMs: w.start_ms ?? 0,
+      }))
+      .filter(w => w.element !== null);
+  } else {
+    // Fallback: distribute segment highlights proportionally by character count
+    audioEl.addEventListener('loadedmetadata', () => {
+      const totalMs    = audioEl.duration * 1000;
+      const totalChars = text.length;
+      wordTimeline = segments.map(seg => ({
+        element: seg.element,
+        startMs: (seg.start / totalChars) * totalMs,
+      }));
+    });
+  }
 
   audioEl.addEventListener('play',  () => setAudioState('playing'));
   audioEl.addEventListener('pause', () => setAudioState('paused'));
@@ -129,7 +155,7 @@ async function startSpeech() {
     setAudioState('idle');
   });
 
-  // Highlight the element that corresponds to the current playback position
+  // Highlight the element that owns the current word
   audioEl.addEventListener('timeupdate', () => {
     const ms = audioEl.currentTime * 1000;
     let current = null;
