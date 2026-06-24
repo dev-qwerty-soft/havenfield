@@ -29,7 +29,9 @@ function buildSpeechContent() {
   let text = '';
 
   elements.forEach(el => {
-    const raw = el.innerText.replace(/\s+/g, ' ').trim();
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('br').forEach(br => br.replaceWith(' '));
+    const raw = clone.textContent.replace(/\s+/g, ' ').trim();
     if (!raw) return;
 
     if (text) {
@@ -81,7 +83,7 @@ function buildTimeline(text, segments, timestamps) {
   const timeline = [];
   for (const seg of segments) {
     const first = wordPositions.find(w => w.idx >= seg.start && w.idx < seg.end);
-    const label = seg.element.className + ': "' + seg.element.innerText.slice(0, 30) + '"';
+    const label = seg.element.className + ': "' + seg.element.textContent.slice(0, 30) + '"';
     if (first) {
       console.log('[TTS] segment', label, '→ starts at', first.startMs + 'ms, first word:', JSON.stringify(first.word));
       timeline.push({ element: seg.element, startMs: first.startMs });
