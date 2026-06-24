@@ -18,6 +18,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// === DEBUG MODE (remove after fix) ===
+if (isset($_GET['debug'])) {
+    $payload = json_encode([
+        'text'         => 'Hello.',
+        'voice_id'     => INWORLD_VOICE,
+        'audio_config' => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
+        'temperature'  => 1,
+        'model_id'     => INWORLD_MODEL,
+    ]);
+    $ch = curl_init('https://api.inworld.ai/tts/v1/voice:stream');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Basic ' . INWORLD_API_KEY,
+            'Content-Type: application/json',
+        ],
+    ]);
+    $raw      = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    echo json_encode(['http_code' => $httpCode, 'raw' => substr($raw, 0, 2000)]);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
@@ -77,11 +104,12 @@ function splitChunks(string $text, int $max): array {
 // === CALL INWORLD FOR ONE CHUNK ===
 function callInworld(string $text): array {
     $payload = json_encode([
-        'text'         => $text,
-        'voice_id'     => INWORLD_VOICE,
-        'audio_config' => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
-        'temperature'  => 1,
-        'model_id'     => INWORLD_MODEL,
+        'text'                   => $text,
+        'voice_id'               => INWORLD_VOICE,
+        'audio_config'           => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
+        'temperature'            => 1,
+        'model_id'               => INWORLD_MODEL,
+        'enable_word_timestamps' => true,
     ]);
 
     $ch = curl_init('https://api.inworld.ai/tts/v1/voice:stream');
@@ -105,35 +133,77 @@ function callInworld(string $text): array {
         return ['error' => true, 'code' => $httpCode, 'detail' => $raw, 'curl' => $curlErr];
     }
 
-    // Parse streaming JSON lines / SSE
     $audioBinary = '';
     $timestamps  = [];
 
-    foreach (explode("\n", $raw) as $line) {
-        $line = trim($line);
-        if (!$line || $line === 'data: [DONE]') continue;
-        if (str_starts_with($line, 'data: ')) $line = substr($line, 6);
-
-        $chunk = json_decode($line, true);
-        if (!$chunk) continue;
-
-        $result = $chunk['result'] ?? $chunk;
-
-        if (!empty($result['audio_content'])) {
-            $audioBinary .= base64_decode($result['audio_content']);
+    // Try single JSON response first (Inworld returns complete JSON, not SSE lines)
+    $json = json_decode($raw, true);
+    if ($json) {
+        $chunks = isset($json['result']) ? [$json] : $json;
+        foreach ((array) $chunks as $chunk) {
+            $result = $chunk['result'] ?? $chunk;
+            if (!empty($result['audioContent'])) {
+                $audioBinary .= base64_decode($result['audioContent']);
+            }
+            $words = $result['alignment']['words']
+                  ?? $result['timestamps']['words']
+                  ?? $result['words']
+                  ?? [];
+            foreach ($words as $w) {
+                $timestamps[] = $w;
+            }
         }
-
-        $words = $result['alignment']['words']
-              ?? $result['timestamps']['words']
-              ?? $result['words']
-              ?? [];
-
-        foreach ($words as $w) {
-            $timestamps[] = $w;
+    } else {
+        // Fallback: parse line-by-line SSE
+        foreach (explode("\n", $raw) as $line) {
+            $line = trim($line);
+            if (!$line || $line === 'data: [DONE]') continue;
+            if (str_starts_with($line, 'data: ')) $line = substr($line, 6);
+            $chunk = json_decode($line, true);
+            if (!$chunk) continue;
+            $result = $chunk['result'] ?? $chunk;
+            if (!empty($result['audioContent'])) {
+                $audioBinary .= base64_decode($result['audioContent']);
+            }
+            $words = $result['alignment']['words']
+                  ?? $result['timestamps']['words']
+                  ?? $result['words']
+                  ?? [];
+            foreach ($words as $w) {
+                $timestamps[] = $w;
+            }
         }
     }
 
     return ['audio' => $audioBinary, 'timestamps' => $timestamps];
+}
+
+// === DEBUG MODE (remove after fix) ===
+if (isset($_GET['debug'])) {
+    $payload = json_encode([
+        'text'         => 'Hello.',
+        'voice_id'     => INWORLD_VOICE,
+        'audio_config' => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
+        'temperature'  => 1,
+        'model_id'     => INWORLD_MODEL,
+    ]);
+    $ch = curl_init('https://api.inworld.ai/tts/v1/voice:stream');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Basic ' . INWORLD_API_KEY,
+            'Content-Type: application/json',
+        ],
+    ]);
+    $raw      = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    // Return first 2000 chars of raw response so we can see the format
+    echo json_encode(['http_code' => $httpCode, 'raw' => substr($raw, 0, 2000)]);
+    exit;
 }
 
 // === PROCESS CHUNKS & MERGE ===
