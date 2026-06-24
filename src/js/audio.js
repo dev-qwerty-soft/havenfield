@@ -20,7 +20,7 @@ const SPEAK_SEL = [
 let audioEl          = null;
 let audioState       = 'idle';
 let currentHighlight = null;
-let wordTimeline     = []; // [{ element, startMs, endMs }]
+let wordTimeline     = []; // [{ element, startMs }]
 
 // ── Build concatenated text + character-range → element map ──
 
@@ -43,19 +43,6 @@ function buildSpeechContent() {
   });
 
   return { text, segments };
-}
-
-// Map each whitespace-delimited token in text to the segment that owns it
-function buildWordMap(text, segments) {
-  const map   = [];
-  const regex = /\S+/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    const pos = match.index;
-    const seg = segments.find(s => pos >= s.start && pos < s.end);
-    map.push(seg ? seg.element : null);
-  }
-  return map;
 }
 
 // ── Highlight helpers ──────────────────────────────────────
@@ -98,7 +85,6 @@ async function startSpeech() {
   setAudioState('loading');
 
   const { text, segments } = buildSpeechContent();
-  const wordMap = buildWordMap(text, segments);
 
   let data;
   try {
@@ -121,15 +107,17 @@ async function startSpeech() {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
 
-  // Build timeline: each word timestamp → owning DOM element
-  wordTimeline = (data.timestamps ?? [])
-    .map((w, i) => ({
-      element: wordMap[i] ?? null,
-      startMs: w.start_ms ?? w.startMs ?? w.start ?? 0,
-    }))
-    .filter(w => w.element !== null);
-
   audioEl = new Audio(blobUrl);
+
+  // Once duration is known, distribute segment start times proportionally by char position
+  audioEl.addEventListener('loadedmetadata', () => {
+    const totalMs    = audioEl.duration * 1000;
+    const totalChars = text.length;
+    wordTimeline = segments.map(seg => ({
+      element: seg.element,
+      startMs: (seg.start / totalChars) * totalMs,
+    }));
+  });
 
   audioEl.addEventListener('play',  () => setAudioState('playing'));
   audioEl.addEventListener('pause', () => setAudioState('paused'));
@@ -141,7 +129,7 @@ async function startSpeech() {
     setAudioState('idle');
   });
 
-  // Highlight the element that owns the current word
+  // Highlight the element that corresponds to the current playback position
   audioEl.addEventListener('timeupdate', () => {
     const ms = audioEl.currentTime * 1000;
     let current = null;
