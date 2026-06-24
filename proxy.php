@@ -3,6 +3,7 @@
 define('INWORLD_API_KEY', 'Q3FqNzBEWHVqNFREQ2IyZ3dSbG5yLWxwRlRGVnBFQkQ6b21IY3hsVThCeFlpZE5lWVVtZllRRA==');
 define('INWORLD_VOICE',   'Clive');
 define('INWORLD_MODEL',   'inworld-tts-1.5-mini');
+define('CHUNK_MAX',       1600); // Inworld limit is 2000, stay safe
 define('CACHE_DIR',       __DIR__ . '/tts-cache/');
 define('ALLOWED_ORIGIN',  'https://dev-qwerty-soft.github.io');
 
@@ -46,75 +47,134 @@ if (file_exists($cacheFile)) {
     exit;
 }
 
-// === INWORLD API ===
-$payload = json_encode([
-    'text'         => $text,
-    'voice_id'     => INWORLD_VOICE,
-    'audio_config' => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
-    'temperature'  => 1,
-    'model_id'     => INWORLD_MODEL,
-]);
+// === SPLIT TEXT INTO CHUNKS ≤ CHUNK_MAX chars ===
+function splitChunks(string $text, int $max): array {
+    if (strlen($text) <= $max) return [$text];
 
-$ch = curl_init('https://api.inworld.ai/tts/v1/voice:stream');
-curl_setopt_array($ch, [
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => $payload,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 30,
-    CURLOPT_HTTPHEADER     => [
-        'Authorization: Basic ' . INWORLD_API_KEY,
-        'Content-Type: application/json',
-    ],
-]);
+    $chunks = [];
+    while (strlen($text) > $max) {
+        $slice = substr($text, 0, $max);
 
-$raw      = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlErr  = curl_error($ch);
-curl_close($ch);
+        // Prefer to break at sentence boundary
+        $pos = strrpos($slice, '. ');
+        if ($pos === false) {
+            // Fall back to word boundary
+            $pos = strrpos($slice, ' ');
+        }
+        if ($pos === false) {
+            $pos = $max;
+        }
 
-if ($curlErr || $httpCode !== 200) {
-    http_response_code(502);
-    echo json_encode([
-        'error'  => 'Inworld API error',
-        'code'   => $httpCode,
-        'detail' => $raw,
-        'curl'   => $curlErr,
-    ]);
-    exit;
+        $chunks[] = rtrim(substr($text, 0, $pos + 1));
+        $text     = ltrim(substr($text, $pos + 1));
+    }
+
+    if ($text !== '') $chunks[] = $text;
+
+    return $chunks;
 }
 
-// === PARSE STREAMING RESPONSE (JSON lines / SSE) ===
+// === CALL INWORLD FOR ONE CHUNK ===
+function callInworld(string $text): array {
+    $payload = json_encode([
+        'text'         => $text,
+        'voice_id'     => INWORLD_VOICE,
+        'audio_config' => ['audio_encoding' => 'MP3', 'speaking_rate' => 0.9],
+        'temperature'  => 1,
+        'model_id'     => INWORLD_MODEL,
+    ]);
+
+    $ch = curl_init('https://api.inworld.ai/tts/v1/voice:stream');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Basic ' . INWORLD_API_KEY,
+            'Content-Type: application/json',
+        ],
+    ]);
+
+    $raw      = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr || $httpCode !== 200) {
+        return ['error' => true, 'code' => $httpCode, 'detail' => $raw, 'curl' => $curlErr];
+    }
+
+    // Parse streaming JSON lines / SSE
+    $audioBinary = '';
+    $timestamps  = [];
+
+    foreach (explode("\n", $raw) as $line) {
+        $line = trim($line);
+        if (!$line || $line === 'data: [DONE]') continue;
+        if (str_starts_with($line, 'data: ')) $line = substr($line, 6);
+
+        $chunk = json_decode($line, true);
+        if (!$chunk) continue;
+
+        $result = $chunk['result'] ?? $chunk;
+
+        if (!empty($result['audio_content'])) {
+            $audioBinary .= base64_decode($result['audio_content']);
+        }
+
+        $words = $result['alignment']['words']
+              ?? $result['timestamps']['words']
+              ?? $result['words']
+              ?? [];
+
+        foreach ($words as $w) {
+            $timestamps[] = $w;
+        }
+    }
+
+    return ['audio' => $audioBinary, 'timestamps' => $timestamps];
+}
+
+// === PROCESS CHUNKS & MERGE ===
+$chunks      = splitChunks($text, CHUNK_MAX);
 $audioBinary = '';
 $timestamps  = [];
+$timeOffset  = 0; // ms — shifts each chunk's timestamps to absolute position
 
-foreach (explode("\n", $raw) as $line) {
-    $line = trim($line);
-    if (!$line || $line === 'data: [DONE]') continue;
+foreach ($chunks as $chunk) {
+    $result = callInworld($chunk);
 
-    // Strip SSE prefix if present
-    if (str_starts_with($line, 'data: ')) {
-        $line = substr($line, 6);
+    if (!empty($result['error'])) {
+        http_response_code(502);
+        echo json_encode([
+            'error'  => 'Inworld API error',
+            'code'   => $result['code'],
+            'detail' => $result['detail'],
+            'curl'   => $result['curl'],
+        ]);
+        exit;
     }
 
-    $chunk = json_decode($line, true);
-    if (!$chunk) continue;
+    $audioBinary .= $result['audio'];
 
-    // Inworld may wrap in "result" key
-    $result = $chunk['result'] ?? $chunk;
+    $chunkWords    = $result['timestamps'];
+    $chunkDuration = 0;
 
-    if (!empty($result['audio_content'])) {
-        $audioBinary .= base64_decode($result['audio_content']);
+    foreach ($chunkWords as $w) {
+        // Normalize field names (start_ms / startMs / start)
+        $startMs = $w['start_ms'] ?? $w['startMs'] ?? $w['start'] ?? 0;
+        $endMs   = $w['end_ms']   ?? $w['endMs']   ?? $w['end']   ?? 0;
+
+        $w['start_ms'] = $startMs + $timeOffset;
+        $w['end_ms']   = $endMs   + $timeOffset;
+
+        $timestamps[]  = $w;
+        $chunkDuration = max($chunkDuration, $endMs);
     }
 
-    // Collect word timestamps from any known key paths
-    $words = $result['alignment']['words']
-          ?? $result['timestamps']['words']
-          ?? $result['words']
-          ?? [];
-
-    foreach ($words as $w) {
-        $timestamps[] = $w;
-    }
+    // Offset for next chunk = end of this chunk + 200ms pause
+    $timeOffset += $chunkDuration + 200;
 }
 
 // === SAVE & RETURN ===
