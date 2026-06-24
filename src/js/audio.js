@@ -10,9 +10,8 @@ const SPEAK_SEL = [
   '.hero__label', '.hero__title', '.hero__text',
   '.section__label', '.section__title',
   '.card__title', '.card__text',
-  '.property__name', '.property__meta',
+  '.property__name',
   '.step__title', '.step__text',
-  '.stat__num',
   '.testimonial__text',
   '.cta__title', '.cta__text',
 ].join(', ');
@@ -45,20 +44,51 @@ function buildSpeechContent() {
   return { text, segments };
 }
 
-// Map each timestamp word to its DOM element by finding its char position in text
+// Spread consecutive entries that share the same startMs evenly across the available window
+function fixClumpedTimeline(timeline, totalMs) {
+  for (let i = 0; i < timeline.length - 1; ) {
+    let j = i + 1;
+    while (j < timeline.length && timeline[j].startMs === timeline[i].startMs) j++;
+
+    if (j - i > 1) {
+      const from = timeline[i].startMs;
+      const to   = j < timeline.length ? timeline[j].startMs : totalMs;
+      for (let k = 0; k < j - i; k++) {
+        timeline[i + k].startMs = from + (k / (j - i)) * (to - from);
+      }
+      console.log('[TTS] fixed clump of', j - i, 'entries at', from + 'ms →', from + '…' + Math.round(to) + 'ms');
+    }
+    i = j;
+  }
+}
+
+// Build element-level timeline: find when each segment first appears in timestamps
 function buildTimeline(text, segments, timestamps) {
-  const timeline = [];
+  // Step 1: locate each timestamp word in text by char position
+  const wordPositions = [];
   let searchFrom = 0;
-
   for (const t of timestamps) {
-    const idx = text.indexOf(t.word, searchFrom);
-    if (idx === -1) continue;
+    const idx = text.toLowerCase().indexOf(t.word.toLowerCase(), searchFrom);
+    if (idx === -1) {
+      console.warn('[TTS] word not found in text:', JSON.stringify(t.word), '(searchFrom:', searchFrom, ')');
+      continue;
+    }
+    wordPositions.push({ idx, startMs: t.start_ms, word: t.word });
     searchFrom = idx + t.word.length;
-
-    const seg = segments.find(s => idx >= s.start && idx < s.end);
-    if (seg) timeline.push({ element: seg.element, startMs: t.start_ms });
   }
 
+  // Step 2: for each segment, take the startMs of its first located word
+  const timeline = [];
+  for (const seg of segments) {
+    const first = wordPositions.find(w => w.idx >= seg.start && w.idx < seg.end);
+    const label = seg.element.className + ': "' + seg.element.innerText.slice(0, 30) + '"';
+    if (first) {
+      console.log('[TTS] segment', label, '→ starts at', first.startMs + 'ms, first word:', JSON.stringify(first.word));
+      timeline.push({ element: seg.element, startMs: first.startMs });
+    } else {
+      console.warn('[TTS] segment NOT MAPPED:', label);
+    }
+  }
   return timeline;
 }
 
@@ -131,6 +161,10 @@ async function startSpeech() {
   if (timestamps.length > 0) {
     // Use real word timestamps: locate each word by char position, no index drift
     wordTimeline = buildTimeline(text, segments, timestamps);
+    // After duration is known, fix any clumped entries from broken chunks
+    audioEl.addEventListener('loadedmetadata', () => {
+      fixClumpedTimeline(wordTimeline, audioEl.duration * 1000);
+    });
   } else {
     // Fallback: distribute segment highlights proportionally by character count
     audioEl.addEventListener('loadedmetadata', () => {
