@@ -165,7 +165,7 @@ function callInworld(string $text): array {
             $startTimes = $alignment['wordStartTimeSeconds'] ?? [];
             $endTimes   = $alignment['wordEndTimeSeconds']   ?? [];
             foreach ($wordTokens as $i => $word) {
-                if (trim($word) === '') continue; // skip whitespace tokens
+                if (!preg_match('/\w/', $word)) continue; // skip whitespace/punctuation-only tokens
                 $timestamps[] = [
                     'word'     => $word,
                     'start_ms' => (int) round(($startTimes[$i] ?? 0) * 1000),
